@@ -1,51 +1,66 @@
+
+# IMPORTS
+
+# Data Handling
 import pandas as pd
 import numpy as np
 import scipy.stats as stats
-import statistics
+
+# Visualization
 import matplotlib.pyplot as plt
-import statsmodels.stats.weightstats as ws
+
+# Statistical Analysis
+import statistics
 from statsmodels.stats.proportion import proportions_ztest
 from statsmodels.stats.multitest import multipletests
-import matplotlib.pyplot as plt
-import seaborn as sns
 from scipy.stats import mannwhitneyu, ttest_ind
 
+######################################################################################################################################################################
+
+
+# CONFIGURATION VARIABLES - SET BEFORE RUNNING THE PROGRAM
 
 # where the results will be stored. 
 # in order to work properly, please create the directory first before hand, and make sure there are subdirectories called "tables" and "plots" within 
-# or else you will get an error. In other words, the code will not make those directories on its own. 
+# or else you will get an error. In other words, the code will not make those directories on its own. Provided is a sample directory to show you how
+# to set up before running. 
 save_prefix = './sample/'
 
-# plots gpa histogram
-def plot_histogram(values, title):
+######################################################################################################################################################################
+
+# FUNCTIONS - All methods have docstrings, please refer to them if you have any confusion. 
+
+def plot_histogram(values, filename):
+    """Plots a generic histogram and saves image to the plots folder under the given filename, but is hard-coded for gpa difference analysis.
+
+    Args:
+        values (List): Contains a list of values
+        filename (String): Filepath to write results
+    """
     plt.figure()
     plt.hist(values, bins=20, rwidth = 0.9)
     plt.xlabel('Prior GPA Differences')
     plt.ylabel('Count')
     plt.title('Prior GPA Difference Distribution')
-    plt.savefig(save_prefix + 'plots/gpa_difference_histogram.png')  
+    plt.savefig(filename)  
     plt.close()
     
-# plots density charts
 def plot_density(dist1, dist2, dist1_name, dist2_name, variable, primary_color, secondary_color, title, xlabel, dist_count=2):
-    # plt.figure()
-    # sns.histplot(data=dist1[variable], kde=True, stat="density", color=primary_color, alpha=0.5, label="Treated", bins=20)
-    # sns.histplot(data=dist2[variable], kde=True, stat="density", color=secondary_color, alpha=0.5, label="Control", bins=20)
- 
-    # plt.xlabel(variable)
-    # plt.ylabel("density")
-    # plt.title(title)
- 
-    # plt.savefig('./data/' + title)
-    # plt.close()
-    # df = pd.concat([dist1, dist2], keys=['df1', 'df2']).copy()
+    """Plots density functions of two distributions. Plot saved to the plots folder under the given title. 
+
+    Args:
+        dist1 (DataFrame): A distribution of data.
+        dist2 (DataFrame): Another distribution of data.
+        dist1_name (String): The name of distribution 1.
+        dist2_name (String): The name of distribution 2.
+        variable (String): The variable (as a key in the dataframe) to compare amongst distribution 1 and distribution 2.
+        primary_color (String): The color to visualize distribution 1 as.
+        secondary_color (String): The color to visualize distribution 2 as.
+        title (String): Title to describe the plot (and the name of the file to save as - no extensions)
+        xlabel (String): Description of the variable argument.
+        dist_count (int, optional): Originally implemented for more than 2 distributions, but not finished. Keep the default, which defaults to 2.
+    """
     
-    # plt.figure()
-    # df['Distribution'] = ['Distribution 1']*len(dist1) + ['Distribution 2']*len(dist2)
-    # sns.histplot(data=df, x=variable, hue='Distribution', element='step', stat='density')
-    # plt.savefig('./data/' + title)
-    
-    # plt.close()
     x = []
     colors = []
     labels = []
@@ -73,13 +88,17 @@ def plot_density(dist1, dist2, dist1_name, dist2_name, variable, primary_color, 
     plt.savefig(save_prefix + 'plots/' + title + '.png')
     plt.close()
     
-# same as in match.py
 def categorical_to_numerical(_data):
     
-    """Takes in data and columns, converts categorical data to discrete numerical values.
+    """Converts all columns of a dataframe to be numerical instead of categorical. Useful for converting string type columns to int. 
+    Is necessary for parts of the matching algorithm.
 
+    Args:
+        _data (DataFrame): A DataFrame object that you'd like to be all numerical
+        
     Returns:
-        (DataFrame, Dict): DataFrame: altered data df with numerical values, Dict: Mapping of numbers to categories for future use
+        2-tuple (DataFrame, map): Returns a converted dataframe which is only numerical (by enumeration). 
+        A map is returned as the second object which maps numerical data back to its categorical counterpart.
     """
     data = _data.copy()
     name_map = {}
@@ -100,8 +119,13 @@ def categorical_to_numerical(_data):
                 
     return data, name_map
 
-# prints a map for debugging
 def print_map(_map, _key=None):
+    """Prints a map for debugging purposes. Supports printing values for a particular optional key.
+
+    Args:
+        _map (map): A python map with keys the same type as _key.
+        _key (String, optional): A key for printing out values of a particular key. Prints all keys if None. Defaults to None.
+    """
     if (_key == None):
         for key in _map.keys():
             print("{}: {}".format(key, _map[key]))
@@ -109,8 +133,17 @@ def print_map(_map, _key=None):
     else:
         print("{}: {}".format(_key, _map[_key]))
 
-# calculates averate treamtment effect, only need to pass in dataset, lots of abstraction as long as all the right variables exist in the df.
 def calculate_average_treatment_effect(df, key):
+    """Calculates Average Treatment Effect (ATE) of a dataset. Hard-coded for particular group names. Used as a helper for the main ATE method.
+
+    Args:
+        df (DataFrame): Must have the columns: "group", "GPA_Post", and "GPA_Pre". "group" must be split between either 'ERSP' or 'Control'. 
+        If you don't have "GPA_Post" or "GPA_Pre" in the original dataset, "GPA_Post" and "GPA_Pre" should be added to the dataset generated by match.py
+        key (String): Sometimes only a subgroup is analyzed here, key should be the name of the subgroup. 
+
+    Returns:
+        float: Returns the average treatment effect between the Control and Treated groups.
+    """
     treated = df[df.group == 'ERSP'].copy()
     control = df[df.group == 'Control'].copy()
     print(key)
@@ -122,8 +155,17 @@ def calculate_average_treatment_effect(df, key):
     ate = (treated['GPA_Post'] - treated['GPA_Pre']).mean() - (control['GPA_Post'] - control['GPA_Pre']).mean()
     return ate
     
-# gets demographic percentages, like in match.py
 def get_demographic_stats(df, category_map):
+    """Generates a table of demographic stats (percentages) with hard-coded filenames. 
+    I don't remember why I decided to make it work on the converted-to-numerical dataset,
+    but that is what this function requires. 
+
+    Args:
+        df (DataFrame): An all-numerical dataset
+        category_map (map): A map describing corresponding enums with their categories.
+        
+        Can generate both arguments from the categorical_to_numerical method.
+    """
     treated_stats = np.zeros(shape=(len(category_map['SEX']), len(category_map['eth_grp'])))
     control_stats = np.zeros(shape=(len(category_map['SEX']), len(category_map['eth_grp'])))
     
@@ -160,8 +202,16 @@ def get_demographic_stats(df, category_map):
     pd.DataFrame(result_treated).to_csv(save_prefix + 'tables/ERSP_demographics.csv',float_format='%.5f')
     pd.DataFrame(result_control).to_csv(save_prefix + 'tables/Control_Demographics.csv',float_format='%.5f')
         
-# counts how many differences exist among each matching variable. For example, if two matched students differ on a ethnicity variable, this counts as a variable difference.
 def get_difference_count(_df, propensity_vars):
+    """Counts the number of differences between matched variables and constructs a table with these counts. 
+    For example, if two matched students differ on an ethnicity variable, this counts as a variable difference,
+    which contributes to the cell for ethnicity.
+
+    Args:
+        _df (DataFrame): An all-numerical dataframe. It is essential that this is all numerical, since the way the algorithm checks if two variables are the same is by subtracting 
+        the columns and checking if the result is 0. 
+        propensity_vars (List): A list of variables of interest. 
+    """
     vars = propensity_vars
     df = _df[vars]
     differences = {}
@@ -205,9 +255,14 @@ def get_difference_count(_df, propensity_vars):
     pd.DataFrame(gpa_stats.items(), columns=['Stat', 'Value']).to_csv(save_prefix + 'tables/gpa_difference_stats.csv', index=False, float_format='%.2f')
     pd.DataFrame(differences.items(), columns=['Variable', 'Difference']).to_csv(save_prefix + 'tables/variable_difference_count.csv', index=False)
     
-# this finds similarity, but I ended up not using it, and instead used a percentage to calculate similarity. 
-# For example, if all the students matched perfectly on admit cohort, that varaible would have 100% similarity. If 7/10 groups matched perfectly, this was 70%
 def get_similarity_stats(df, propensity_vars):
+    """DO NOT USE   :O   ... This method finds.... a type of similarity? What is important is that I ended up not using this method, and instead used a percentage to calculate similarity. 
+    For example, if all the students matached perfectly on admit cohort, that variable would have 100% similarity. If 7/10 groups matched perfectly, this was 70%. 
+
+    Args:
+        df (DataFrame): The entire distribution
+        propensity_vars (List): Variable keys of interest.
+    """
     vars = propensity_vars
     treated = df[df['group'] == 0]
     control = df[df['group'] == 1]
@@ -220,10 +275,13 @@ def get_similarity_stats(df, propensity_vars):
         
     pd.DataFrame(similarity_scores.items(), columns=['Variable', 'Similarity']).to_csv(save_prefix + 'tables/Similarity_Scores.csv', index=False, float_format='%.5f')
     
-# calculates average treatment effect, lots of abstraction, as long as the dataset has the right variables, all you need to do is pass it in. 
-# so, you might need to preprocess a little bit. 
 def get_average_treatment_effect(df):
-    
+    """The main ATE method. It calculates Average Treatment Effect for multiple subgroups of interest (hard-coded). There is much abstraction here.
+    Make sure your input DataFrame follows the specifications below. Saves a table of results to a hard-coded filepath. 
+
+    Args:
+        df (DataFrame): A dataframe with the columns: "first_generation", "URM", and "SEX". It calculates ATE, p-score, and z-score. 
+    """
     subgroups_of_interest = {
         'all': df, 
         'first_generation':df[df.first_generation == 1], 
@@ -276,9 +334,17 @@ def get_average_treatment_effect(df):
 
     results.to_csv(save_prefix + 'tables/ate_stats.csv', index=False)
         
-# calculates retention rates depending on a particular subgroup of interest
 def calculate_retention_rates(df,test_name):
-    print("calculating retentin for {}:".format(test_name))
+    """Calculates retention rates of a subgroup. This is used as a helper function to the main retention function. 
+
+    Args:
+        df (DataFrame): An already pre-filtered dataframe which only includes the subgroup specified by test_name. 
+        test_name (String): Subgroup of interest, which has already filtered df.
+
+    Returns:
+        float: a retention percentage for the given subgroup.
+    """
+    print("calculating retention for {}:".format(test_name))
     treated = df[df.group == 'ERSP']
     control = df[df.group == 'Control']
     # print("treated")
@@ -313,9 +379,15 @@ def calculate_retention_rates(df,test_name):
 
     return [retentions[1], treated_n, retentions[0], control_n, stat, pval, pvals_adjusted]
 
-# main retention method, very abstracted, just pass in the df
 def get_retention_stats(df, path):
+    """The main retention method. Saves retention results to a specified path. Calculates retention,
+    test-statistic values, p-values, and holm-adjusted p-values. 
 
+    Args:
+        df (DataFrame): The entire unfiltered dataframe. 
+        path (String): Path to save the table. (For file cleanliness, please provide the path with the table prefix, 
+        as I do not do that automatically for this method - sorry. See the main method for an example of how I use these methods). 
+    """
     subgroups_of_interest = {
         'Full Sample': df, 
         'First Gen':df[df.first_generation == 1], 
@@ -363,9 +435,17 @@ def get_retention_stats(df, path):
     print(retention_stats)
     pd.DataFrame(retention_stats, index=index).to_csv(path, float_format='%.3f')
     
-# helper
 def calculate_mann_whitney_u(dist1, dist2, variable):
-    
+    """A helper function for the main mann whitney u method. Calculates the U statistic, medians, and p-value between two distributions. 
+
+    Args:
+        dist1 (DataFrame): A distribution that includes the variable argument as a column.
+        dist2 (DataFrame): Another distribution that includes the variable argument as a column. 
+        variable (String): A variable of interest. 
+
+    Returns:
+        result (map): A mapping of the different results to their values. Includes U-stat, medians, and p-value. 
+    """
     u_stat, pval = mannwhitneyu(dist1[variable], dist2[variable])
     
     result = {
@@ -376,11 +456,15 @@ def calculate_mann_whitney_u(dist1, dist2, variable):
     }
     return result
     
-def mann_whitney_to_csv():
-    pass
-
-# main mann_whitney_u method, abstracted: just pass in the dataset
 def get_mann_whitney_u_stats(_df):
+    """The main mann whitney u method. It finds a the u-stat, medians, and p-value of several different hard-coded subgroups of interest.  
+    It will produce plots of the densities between groups, as well as a table with the stats mentioned. The plots names and paths are hard-coded,
+    as well as the sub-groups of interest. 
+
+    Args:
+        _df (DataFrame): The entire unfiltered dataframe.
+ 
+    """
     
     df = _df[_df.group == 'ERSP']
     df_control = _df[_df.group == 'Control']
@@ -493,173 +577,84 @@ def get_mann_whitney_u_stats(_df):
         pd.DataFrame(result, index=index).to_csv(control_subgroups_of_interest[key][2])
     
 
-"""
-def add_gpa_statistics(df):
-    gpa = {
-        'A+': 1,
-        'A': 1,
-        'A-': 0.925,
-        'B+': 0.825,
-        'B': 0.75,
-        'B-': 0.675,
-        'C+': 0.575,
-        'C': 0.5,
-        'C-': 0.425,
-        'D+': 0.325,
-        'D': 0.25,
-        'D-': 0.175,
-        'F+': 0,
-        'F': 0,
-        'F-': 0
-    }
-    units = {
-        'CMPSC 40': 5,
-        'CMPSC 196': 2
-    }
-    df_courses = pd.read_csv('All-data-OLD - ERSP_Courses.csv')
-    df['GPA_Pre'] = df['F2GPA']
-    df.loc[df['YR2 Match'] == 0, 'GPA_Pre'] = df.loc[df['YR2 Match'] == 0, 'F3GPA']
-    df['GPA_Diff'] = df['GPA_Post'] - df['GPA_Pre']
-    
-    df['GPA_PRE'] = 0
-    df['GPA_POST'] = 0
-    
-    for row_idx in range(df.shape[0]):
-        current_row = df.iloc[row_idx]
-        # print(current_row['ID'])
-        current_grades = df_courses[df_courses['ID'] == current_row['ID']]
-        
-        
-        pre_ersp_cutoff = 0
-        if current_row['group'] == 'ERSP':
-            pre_ersp_cutoff = current_row['ERSP_Cohort'] * 10 + 3
-        else:
-            if current_row['YR2 Match'] == 1:
-                # 20184 => 20194 so 20193
-                pre_ersp_cutoff = current_row['Admit_Cohort'] + 10 - 1
-            else:
-                # 20184 => 20204 so 20203
-                pre_ersp_cutoff = current_row['Admit_Cohort'] + 20 - 1
-                
-        post_ersp_cutoff = pre_ersp_cutoff + 10
-        
-        pre_ersp_cutoff_year = pre_ersp_cutoff // 10
-        pre_ersp_cutoff_qtr = pre_ersp_cutoff % 10
-        post_ersp_cutoff_year = post_ersp_cutoff // 10
-        post_ersp_cutoff_qtr = post_ersp_cutoff % 10
-        
-        # print("Admit: {}".format(current_row['Admit_Cohort']))
-        # print("pre_ersp_cutoff: {}".format(pre_ersp_cutoff))
-        # print("post_ersp_cutoff: {}".format(post_ersp_cutoff))
-        grade_points_pre = 0
-        grade_points_total_pre = 0
-        grade_points_post = 0
-        grade_points_total_post = 0
-        
-        for row_jdx in range(current_grades.shape[0]):
-            course = current_grades.iloc[row_jdx]['Course']
-            grade = current_grades.iloc[row_jdx]['Grade']
-            quarter = current_grades.iloc[row_jdx]['Quarter'] % 10
-            year = current_grades.iloc[row_jdx]['Quarter'] // 10
-            # print("\t year: {} \n\tquarter: {}".format(year, quarter))
-            if grade not in gpa.keys():
-                # skip grade, does not count in current calculation
-                continue
-            
-            total_points = 16
-            if course in units.keys():
-                total_points = units[course] * 4
-                
-            # decide whether to put it in pre or post calculations:
-            if (year < pre_ersp_cutoff_year) or (year == pre_ersp_cutoff_year and quarter <= pre_ersp_cutoff_qtr):
-                grade_points_total_pre += total_points
-                grade_points_pre += gpa[grade] * total_points
-            elif (year > post_ersp_cutoff_year) or (year == post_ersp_cutoff_year and quarter >= post_ersp_cutoff_qtr):
-                grade_points_total_post += total_points
-                grade_points_post += gpa[grade] * total_points
-            
-        if grade_points_total_pre != 0:
-            df.at[row_idx,'GPA_PRE'] = (grade_points_pre / grade_points_total_pre) * 4
-        if grade_points_total_post != 0:
-            df.at[row_idx,'GPA_POST'] = (grade_points_post / grade_points_total_post) * 4
-        
-    # df[['ID', 'GPA_PRE', 'GPA_POST', 'Pre_ERSP_GPA']].to_csv('peek2.csv')
-    # set cumulative post gpa
-    post_gpa = pd.read_csv('ERSP_post_program_GPA - Sheet1.csv')
-    for i in range(len(df.shape[0])):
-        
-        
-        
-    return df
-"""
+######################################################################################################################################################################
 
-# the following gpa methods are not used, since the match file already provides the gpa information.
-def add_gpa(df):
-    df_gpa = pd.read_csv("ERSP_post_program_GPA - Sheet1.csv")
-    
-    df['cumgpa_3+'] = df_gpa['cumgpa_3+']
-    df['cumgpa_4+'] = df_gpa['cumgpa_4+']
-    
-    return df
-    
-def add_gpa_statistics(df):
-    
-    df = add_gpa(df)
-    
-    df['GPA_Pre'] = df['F2GPA']
-    df.loc[df['YR2 Match'] == 0, 'GPA_Pre'] = df.loc[df['YR2 Match'] == 0, 'F3GPA']
-    
-    df['GPA_Post'] = df['cumgpa_3+']
-    df.loc[df['YR2 Match'] == 0, 'GPA_Post'] = df.loc[df['YR2 Match'] == 0, 'cumgpa_4+']
-    
-    df['GPA_Diff'] = df['GPA_Post'] - df['GPA_Pre']
-    
-    return df
-    
-    
+# MAIN - This is the main function I used for my analysis, depending on your data format, you may need to tweak hard-coded aspects in the analysis code. But, this should be
+#        a good example of how to use each method, and how to set up their preconditions. 
+
+
 def main():
-    # the main function lays out how to use each method. 
     
-    #pass in the file produced by the matching algorithm. 
+    ######################################################################################################################################################################
+
+    # STEP 1: Prep the data
+    # STEP 1a: Start out with the file produced by match.py
+    #         For me, this was called "MATCHED_with_csceqtr copy.csgv"
+    #         Pay attention to the name of the file you chose.
     df = pd.read_csv('MATCHED_with_csceqtr copy.csv')
     
-    # get a dataset with all just in case.
+    # STEP 1b: Get all the data just in case. I happened to use it to generate
+    #         Retention data for the entire control group and compare to the
+    #         matched control group. 
     df_all = pd.read_csv('All-data-NEW-ERSP_Full-Control-Group.csv')
 
-    # convert to categorical just in case. 
+    # STEP 1c: Get an all-numerical dataset, as some methods require it.
     df_numerical, category_map = categorical_to_numerical(df)
     
-    # variables of interest for the study (propensity is probably a bad name for this variable)
+    # STEP 1d: Select the variables of interest for similarity and difference checks. 
+    #          I used this list for getting difference counts, and calculating similarity.
     propensity_vars = ['first_generation', 'Admit_Cohort', 'Major_at_Admission', 'CS_CE_qtr', 'eth_grp', 'SEX', 'GPA_Pre']
     
+    ######################################################################################################################################################################
+
+    
+    # STEP 2: Get Stats for the Matching algorithm
+    # STEP 2a: Pass in numerical data and the coresponding map - see details in get_demographic_stats's docstring
     print()
     print("DEMOGRAPHICS")
     get_demographic_stats(df_numerical, category_map)
     print("\tDemographic Stats reported in '" + save_prefix + "tables/Control_Demographics.csv' and '" + save_prefix + "tables/ERSP_Demographics.csv'\n")
     
+    # STEP 2b: Find the number of differences between variables of interest. Pass in a numerical dataset and variables of interest
+    #          See the doc-string of get_difference_count for details.
     print("DIFFERENCE")
     get_difference_count(df_numerical, propensity_vars)
     print("\tGPA difference Stats reported in '" + save_prefix + "tables/gpa_difference_stats.csv'")
     print("\tVariable difference counts reported in '" + save_prefix + "tables/variable_difference_count.csv'")
     print("\tGPA difference plot reported in '" + save_prefix + "plots/GPA_Difference.png'\n")
     
+    # STEP 2c: Find the similarity measure of the matched group:
+    #          WARNING: I DID NOT USE THIS METHOD, see get_similarity_stats's doc-string for details. 
     print("SIMILARITY")
     get_similarity_stats(df_numerical, propensity_vars)
     print("\tVariable similarity scores reported in '" + save_prefix + "tables/Similarity_Scores.csv'\n")
     
+    ######################################################################################################################################################################
+
+    # STEP 3: Main Objective Analysis - ATE, Retention, and Mann Whitney U.
+    # STEP 3a: Find the average treatment effect. Pass in the matched dataset. See the doc-string
+    #          for get_average_treatment_effect for details.
     print("ATE")
     print(df)
     get_average_treatment_effect(df)
     print("\tAverage Treatment Effect stats reported to '" + save_prefix + "tables/ate_stats.csv'\n")
     
+    # STEP 3b: Find the retention among the matched groups. Here, I am doing analysis between both
+    #          the matched only group and the entire control group. See the doc-string for 
+    #          get_retention_stats for details. 
     print("RETENTION")
     get_retention_stats(df, save_prefix + 'tables/Retention_Data.csv')
     get_retention_stats(df_all, save_prefix + 'tables/ALL_Retention_Data.csv')
     print("Retention Stats reported to 'Retention_Data.csv'\n")
     
+    # STEP 3c: Find the Mann Whitney U stats. Pass in the entire matched dataset. See the doc-string
+    #          of get_mann_whitney_u_stats for details. 
     print("MANN WHITNEY U")
     get_mann_whitney_u_stats(df)
     print("Mann Whitney Stats reported to various tables and plots in '" + save_prefix + "plots' and '" + save_prefix + "tables'\n")
+    
+    ######################################################################################################################################################################
+
     
 if __name__ == '__main__':
     main()
