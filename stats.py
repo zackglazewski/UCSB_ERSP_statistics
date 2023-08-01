@@ -654,7 +654,7 @@ def main():
     print("Mann Whitney Stats reported to various tables and plots in '" + save_prefix + "plots' and '" + save_prefix + "tables'\n")
     
     ######################################################################################################################################################################
-
+    # Enjoy :D and let me know if you have any questions: email me at zglazewski@ucsb.edu
     
 if __name__ == '__main__':
     main()
