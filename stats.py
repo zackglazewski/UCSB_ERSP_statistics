@@ -589,7 +589,7 @@ def main():
 
     # STEP 1: Prep the data
     # STEP 1a: Start out with the file produced by match.py
-    #         For me, this was called "MATCHED_with_csceqtr copy.csgv"
+    #         For me, this was called "MATCHED_with_csceqtr copy.csv"
     #         Pay attention to the name of the file you chose.
     df = pd.read_csv('MATCHED_with_csceqtr copy.csv')
     
@@ -602,7 +602,7 @@ def main():
     df_numerical, category_map = categorical_to_numerical(df)
     
     # STEP 1d: Select the variables of interest for similarity and difference checks. 
-    #          I used this list for getting difference counts, and calculating similarity.
+    #          I used this list for getting difference counts.
     propensity_vars = ['first_generation', 'Admit_Cohort', 'Major_at_Admission', 'CS_CE_qtr', 'eth_grp', 'SEX', 'GPA_Pre']
     
     ######################################################################################################################################################################
